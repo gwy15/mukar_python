@@ -1,15 +1,27 @@
-#include "IceKey.h"
-#include <string>
-#include <iostream>
 #include <fstream>
-#include <vector>
+#include <iostream>
 #include <iterator>
+#include <string>
+#include <vector>
+#include "IceKey.h"
 #include "md5.h"
+
+using uchar = unsigned char;
 
 std::string getKeyForFilename(std::string fileNameWithoutExt) {
     auto filename = "Zhanjian" + fileNameWithoutExt;
     std::cout << filename << std::endl;
     return MD5(filename).md5();
+}
+
+std::vector<uchar> decrypt(std::vector<uchar> input, std::string key) {
+    std::vector<uchar> output(input.size());
+    auto ice = IceKey(0);
+    ice.set((uchar*)key.c_str());
+    for (int i = 0; i < input.size(); i += 8) {
+        ice.decrypt(&input[i], &output[i]);
+    }
+    return output;
 }
 
 int main(int argc, char** argv) {
@@ -18,29 +30,19 @@ int main(int argc, char** argv) {
         return 1;
     }
     auto filename = std::string(argv[1]);
-    auto fileNameWithoutExt = filename.substr(0, filename.size() - 6); // .mukar
+    auto fileNameWithoutExt =
+        filename.substr(0, filename.size() - 6);  // .mukar
     std::cout << "Decrypting " << filename << std::endl;
-    
+
     // read from bin file
     auto inFile = std::ifstream(filename, std::ios::binary);
-    std::vector<unsigned char> inBuffer(std::istreambuf_iterator<char>(inFile), {});
-    // init output buffer
-    auto length = inBuffer.size();
-    std::vector<unsigned char> outBuffer(length);
+    std::vector<uchar> inBuffer(std::istreambuf_iterator<char>(inFile), {});
 
-    
-    // init ice
-    auto ice = IceKey(0);
-    // calc md5 key
     std::string key = getKeyForFilename(fileNameWithoutExt);
-    ice.set((unsigned char*)key.c_str());
-    // ice.set((const unsigned char*)"ab5efcc5ecd228483770d302284828e9");
-    for (int i=0; i<length; i += 8) {
-        ice.decrypt(&inBuffer[i], &outBuffer[i]);
-    }
-    
+    auto output = decrypt(inBuffer, key);
+
     // save output
     auto ofile = std::ofstream(fileNameWithoutExt + ".png", std::ios::binary);
-    ofile.write((const char*)outBuffer.data(), length);
+    ofile.write((const char*)output.data(), output.size());
     std::cout << "Decrypt complete!" << std::endl;
 }
